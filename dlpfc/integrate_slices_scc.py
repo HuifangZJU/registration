@@ -281,7 +281,7 @@ def plot_marker_genes(adata, genes, gene_expr_norm):
 
 root_folder = "/media/huifang/data/registration/result/center_align/scc/"
 gene_folder="/home/huifang/workspace/code/registration/data/SCC/cached-results/H5ADs"
-for i in [2,5,9,10]:
+for i in [5,9,10]:
     fix_adata_path = f"{gene_folder}/patient_{i}_slice_0.h5ad"
     registration_paths = [
         f"{root_folder}/{i}_0_result.npz",
@@ -292,7 +292,7 @@ for i in [2,5,9,10]:
         f"{gene_folder}/patient_{i}_slice_2.h5ad",
     ]
 
-    genes = ['COL17A1', 'KRT1','PTHLH']
+    genes = ['COL17A1', 'KRT1','MMP10','PTHLH']
     adata_single = sc.read_h5ad(fix_adata_path)
     print(adata_single)
     exprs = load_gene_expression(adata_single, genes)
@@ -305,7 +305,7 @@ for i in [2,5,9,10]:
 
 
     adata_combined = integrate_slices(fix_adata_path, moving_adata_paths, registration_paths)
-    adata_combined = spatial_resample_to_adata(adata_combined,grid_size=8)
+    adata_combined = spatial_resample_to_adata(adata_combined,grid_size=6)
     # adata_combined = spatial_resample_nmf(adata_combined,grid_size=50)
 
     print(adata_combined)

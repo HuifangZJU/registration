@@ -52,9 +52,11 @@ def integrate_slices(fix_adata_path, moving_adata_paths, registration_paths):
         if idx==0:
             fix_data.obsm['spatial'] = coords_fixed
             slices.append(fix_data)
+
         moving_data = sc.read_h5ad(adata_path)
         moving_data.obsm['spatial'] = coords_warp
         slices.append(moving_data)
+
     adata_combined = sc.concat(slices, join='outer', label='batch', fill_value=0)
     return adata_combined
 
@@ -256,7 +258,7 @@ def draw_spatial(adata, clusters='my_clusters', sample_name='', draw_contours=Fa
 def plot_marker_genes(adata, genes, gene_expr_norm):
     n = len(genes)
     # fig, axes = plt.subplots(1, n, figsize=(8 * n, 10), constrained_layout=True)
-    fig, axes = plt.subplots(1, n, figsize=(4 * n, 4), constrained_layout=True)
+    fig, axes = plt.subplots(1, n, figsize=(5 * n, 5), constrained_layout=True)
 
     for i, gene in enumerate(genes):
         ax = axes[i] if n > 1 else axes
@@ -282,22 +284,23 @@ def plot_marker_genes(adata, genes, gene_expr_norm):
 root_folder = "/media/huifang/data/registration/result/center_align/DLPFC/attention_fusion/"
 gene_folder = "/home/huifang/workspace/code/registration/data/DLPFC"
 sampleids=[['151507','151508','151509','151510'],['151669','151670','151671','151672'],['151673','151674','151675','151676']]
-for i in range(1,3):
+for i in range(2,3):
 
     fix_adata_path = f"{gene_folder}/{sampleids[i][0]}_preprocessed.h5"
     moving_adata_paths = [
         f"{gene_folder}/{sampleids[i][1]}_preprocessed.h5",
-        # f"{gene_folder}/{sampleids[i][2]}_preprocessed.h5",
-        # f"{gene_folder}/{sampleids[i][3]}_preprocessed.h5"
+        f"{gene_folder}/{sampleids[i][2]}_preprocessed.h5",
+        f"{gene_folder}/{sampleids[i][3]}_preprocessed.h5"
     ]
     registration_paths = [
         f"{root_folder}/{i}_0_result.npz",
-        # f"{root_folder}/{i}_1_result.npz",
-        # f"{root_folder}/{i}_2_result.npz"
+        f"{root_folder}/{i}_1_result.npz",
+        f"{root_folder}/{i}_2_result.npz"
     ]
     genes = ['MFGE8','MOBP','PCP4','TRABD2A']
-    adata_single = sc.read_h5ad(fix_adata_path)
-    # adata_single = sc.read_h5ad('/home/huifang/workspace/code/registration/data/DLPFC/saved_results/center2_a0.1_KL_seed2.h5ad')
+    # adata_single = sc.read_h5ad(fix_adata_path)
+    adata_single = sc.read_h5ad('/home/huifang/workspace/code/registration/data/DLPFC/saved_results/center2_a0.1_KL_seed2.h5ad')
+    print(adata_single)
     # # print(adata_single)
     # # test = input()
     exprs = load_gene_expression(adata_single, genes)
@@ -311,7 +314,9 @@ for i in range(1,3):
 
     adata_combined = integrate_slices(fix_adata_path, moving_adata_paths, registration_paths)
 
-    # adata_combined = spatial_resample_to_adata(adata_combined,grid_size=3)
+
+    adata_combined = spatial_resample_to_adata(adata_combined,grid_size=3)
+    print(adata_combined)
     # adata_combined = spatial_resample_nmf(adata_combined,grid_size=100)
     # print(adata_combined.shape)
 

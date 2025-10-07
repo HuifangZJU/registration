@@ -110,13 +110,13 @@ def visualize_marker_overlay():
     norm_codex = (codex_gene_expr - codex_gene_expr.min()) / (codex_gene_expr.max() - codex_gene_expr.min())
 
     # Convert cmap to RGBA with alpha = normalized expression
-    # cmap_red = cm.get_cmap('Reds')
-    cmap_red = plt.colormaps['Reds']
+    cmap_red = cm.get_cmap('Reds')
+    # cmap_red = plt.colormaps['Reds']
     colors_xenium = cmap_red(norm_xenium)
     colors_xenium[:, -1] = norm_xenium  # set alpha channel
 
-    # cmap_blue = cm.get_cmap('Blues')
-    cmap_blue = plt.colormaps['Blues']
+    cmap_blue = cm.get_cmap('Blues')
+    # cmap_blue = plt.colormaps['Blues']
     colors_codex = cmap_blue(norm_codex)
     colors_codex[:, -1] = norm_codex  # set alpha channel
 
@@ -163,16 +163,20 @@ def visualize_marker_overlay():
     plt.show()
 
 
-file_path = '/media/huifang/data/sennet/xenium_codex_pairs.txt'
+file_path = '/media/huifang/data1/sennet/xenium_codex_pairs.txt'
 file = open(file_path)
 sennet_pairs = file.readlines()
 r_values = []
 p_values = []
 
+
 for i in range(0,len(sennet_pairs)):
     print(i)
     line = sennet_pairs[i]
     xenium_sampleid, xenium_regionid, codex_sampleid, codex_regionid = line.rstrip().split(' ')
+
+
+
     # Xenium: use CDKN1A expression from .X
 
     # xenium_image = plt.imread(
@@ -190,9 +194,10 @@ for i in range(0,len(sennet_pairs)):
     # plt.show()
 
     xenium_gene_data = sc.read_h5ad(
-        "/media/huifang/data/sennet/registered_data/xenium" + f"_{xenium_sampleid}_{xenium_regionid}_registered.h5ad")
+        "/media/huifang/data1/sennet/registered_data/xenium" + f"_{xenium_sampleid}_{xenium_regionid}_registered.h5ad")
+
     codex_gene_data = sc.read_h5ad(
-        "/media/huifang/data/sennet/registered_data/codex" + f"_{codex_sampleid}_{codex_regionid}_registered.h5ad")
+        "/media/huifang/data1/sennet/registered_data/codex" + f"_{codex_sampleid}_{codex_regionid}_registered.h5ad")
 
 
     xenium_coordinate = np.stack([
@@ -215,6 +220,7 @@ for i in range(0,len(sennet_pairs)):
     ], axis=1)
 
     xenium_gene_expr = xenium_gene_data[:, 'CDKN1A'].to_df()['CDKN1A']
+
     # CODEX: use p16 intensity from .obs
     codex_gene_expr = codex_gene_data.obs['p16'].values
     codex_gene_expr = codex_gene_expr - codex_gene_expr.min()

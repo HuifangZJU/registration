@@ -18,30 +18,28 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 ### ----------------------- FILE LOADING FUNCTION -----------------------
 
-result_root='/home/huifang/workspace/code/registration/result/'
+
 
 def load_data_from_folder(folder_path):
     """Load image and spot data from a given folder."""
     data = np.load(folder_path)
     image = data["img1"]
-    # print(image.shape)
-    # print(np.max(data["pts1"]))
-    # test = input()
 
-    if image.shape[0]>512 and image.shape[0]<1500:
-        img1 = cv2.resize(data["img1"],(512,512),interpolation=cv2.INTER_AREA)
-        img2 = cv2.resize(data["img2"], (512, 512), interpolation=cv2.INTER_AREA)
-        pts1 = data["pts1"]/2
-        pts2 = data["pts2"]/2
-        return img1,img2,pts1,pts2,data["label1"].reshape(-1), data["label2"].reshape(-1)
-    elif image.shape[0] >1500 and image.shape[0]<2500:
-        img1 = cv2.resize(data["img1"],(512,512),interpolation=cv2.INTER_AREA)
-        img2 = cv2.resize(data["img2"], (512, 512), interpolation=cv2.INTER_AREA)
-        pts1 = data["pts1"]/4
-        pts2 = data["pts2"]/4
-        return img1,img2,pts1,pts2,data["label1"].reshape(-1), data["label2"].reshape(-1)
-    else:
-        return data["img1"], data["img2"], data["pts1"], data["pts2"], data["label1"].reshape(-1), data["label2"].reshape(-1)
+
+    # if image.shape[0]>512 and image.shape[0]<1500:
+    #     img1 = cv2.resize(data["img1"],(512,512),interpolation=cv2.INTER_AREA)
+    #     img2 = cv2.resize(data["img2"], (512, 512), interpolation=cv2.INTER_AREA)
+    #     pts1 = data["pts1"]/2
+    #     pts2 = data["pts2"]/2
+    #     return img1,img2,pts1,pts2,data["label1"].reshape(-1), data["label2"].reshape(-1)
+    # elif image.shape[0] >1500 and image.shape[0]<2500:
+    #     img1 = cv2.resize(data["img1"],(512,512),interpolation=cv2.INTER_AREA)
+    #     img2 = cv2.resize(data["img2"], (512, 512), interpolation=cv2.INTER_AREA)
+    #     pts1 = data["pts1"]/4
+    #     pts2 = data["pts2"]/4
+    #     return img1,img2,pts1,pts2,data["label1"].reshape(-1), data["label2"].reshape(-1)
+    # else:
+    return data["img1"], data["img2"], data["pts1"], data["pts2"], data["label1"].reshape(-1), data["label2"].reshape(-1)
 
 
 ### ----------------------- IMAGE EVALUATION FUNCTIONS -----------------------
@@ -330,19 +328,34 @@ def compute_region_based_centroid_shift_balanced(region_masks_A, region_masks_B)
 
     # Iterate over class labels in region_masks_A
     for class_label in region_masks_A.keys():
-
         coords_A = region_masks_A[class_label]
         coords_B = region_masks_B[class_label]
 
-        centroids_A = np.mean(coords_A, axis=0)
-        centroids_B = np.mean(coords_B, axis=0)
+        # Geometric center (bounding box mid-point) instead of mean
+        min_A, max_A = np.min(coords_A, axis=0), np.max(coords_A, axis=0)
+        centroids_A = (min_A + max_A) / 2.0
 
-        dx = centroids_A[0] - centroids_B[0]  # 1488.26794226 - 1544.3325
-        dy = centroids_A[1] - centroids_B[1]  # 418.61993267 - 432.871365
+        min_B, max_B = np.min(coords_B, axis=0), np.max(coords_B, axis=0)
+        centroids_B = (min_B + max_B) / 2.0
+
+        dx = centroids_A[0] - centroids_B[0]
+        dy = centroids_A[1] - centroids_B[1]
         dist = math.sqrt(dx ** 2 + dy ** 2)
 
-        # Compute the centroid shifts for matched pairs
         shifts.append(dist)
+
+        # coords_A = region_masks_A[class_label]
+        # coords_B = region_masks_B[class_label]
+        #
+        # centroids_A = np.mean(coords_A, axis=0)
+        # centroids_B = np.mean(coords_B, axis=0)
+        #
+        # dx = centroids_A[0] - centroids_B[0]  # 1488.26794226 - 1544.3325
+        # dy = centroids_A[1] - centroids_B[1]  # 418.61993267 - 432.871365
+        # dist = math.sqrt(dx ** 2 + dy ** 2)
+        #
+        # # Compute the centroid shifts for matched pairs
+        # shifts.append(dist)
 
     return np.mean(np.asarray(shifts)) if shifts else 0.0
 
@@ -712,7 +725,7 @@ def evaluate_single_pair(folder_path,i,j,suffix):
     figure_suffix = str(i)+"_"+str(j)+"_"+suffix
     img_fixed, img_moving, coords_A, coords_B, labels_A, labels_B = load_data_from_folder(folder_path)
     # overlay = 0.5*img_fixed+0.5*img_moving
-    # overlay = overlay.astype(np.uint8)
+    # # overlay = overlay.astype(np.uint8)
     # plt.imshow(overlay)
     # # plt.imshow(0.5*img_fixed+0.5*img_moving)
     # plt.show()
@@ -720,15 +733,10 @@ def evaluate_single_pair(folder_path,i,j,suffix):
 
     # coords_A = coords_A*2
     # coords_B = coords_B*2
-    # if i==0 and j==0:
-    #     labels_A = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_0_region_label.npy")
-    #     labels_B = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_1_region_label.npy")
-    # if i==0 and j==1:
-    #     labels_A = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_1_region_label.npy")
-    #     labels_B = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_2_region_label.npy")
-    # if i==0 and j==2:
-    #     labels_A = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_2_region_label.npy")
-    #     labels_B = np.load("/home/huifang/workspace/code/registration/data/DLPFC/huifang/0_3_region_label.npy")
+    labels_A = np.load(
+        "/media/huifang/data/registration/DLPFC/huifang/" + str(i) + "_" + str(j) + "_" + "region_label.npy")
+    labels_B = np.load(
+        "/media/huifang/data/registration/DLPFC/huifang/" + str(i) + "_" + str(j + 1) + "_" + "region_label.npy")
 
 
     # check_labels(coords_A,labels_A)
@@ -736,18 +744,17 @@ def evaluate_single_pair(folder_path,i,j,suffix):
     if i ==0:
         alpha_value = 0.01
     else:
-        # alpha_value = 0.04
-        alpha_value = 0.01
+        alpha_value = 0.04
 
     results = {
-        "Class-wise Dice Coefficient": compute_region_dice_score(coords_A, labels_A, coords_B, labels_B,figure_suffix,alpha=alpha_value,visualize=False,save=False),
+        "Class-wise Dice Coefficient": compute_region_dice_score(coords_A, labels_A, coords_B, labels_B,figure_suffix,alpha=alpha_value,visualize=True,save=True),
         "Spatial Cross-Correlation": spatial_cross_correlation(coords_A, labels_A, coords_B, labels_B, visualize=False),
-        "Mean Centroid Shift": mean_centroid_shift(coords_A, labels_A, coords_B, labels_B,figure_suffix,visualize=False,save=False),
+        "Mean Centroid Shift": mean_centroid_shift(coords_A, labels_A, coords_B, labels_B,figure_suffix,visualize=True,save=True),
         "Mutual Information": mutual_information(img_fixed, img_moving,visualize=False),
         "SSIM": compute_ssim(img_fixed, img_moving),
         "NCC": normalized_cross_correlation(img_fixed, img_moving),
     }
-    print(results)
+    # print(results)
     return results
 
 
@@ -755,15 +762,14 @@ def evaluate_multiple_pairs(root_folder,keys,suffix):
     all_results = {key: [] for key in keys}
     for i in range(3):
         for j in range(3):
-            # i=2
-            # j=1
+
             data_path = root_folder+str(i)+"_"+str(j)+"_result.npz"
-            print(data_path)
             results = evaluate_single_pair(data_path,i,j,suffix)
             for key in all_results:
                 all_results[key].append(results[key])
 
     avg_results = {key: np.mean(values) for key, values in all_results.items()}
+    print(avg_results)
     return avg_results
 
 
@@ -772,14 +778,21 @@ def evaluate_multiple_pairs(root_folder,keys,suffix):
 # Example: Single pair evaluation
 # single_results = evaluate_single_pair("/home/huifang/workspace/code/registration/result/original/DLPFC/0_0_result.npz")
 # print("Single Pair Evaluation Results:", single_results)
-
+result_root='/media/huifang/data/registration/result/pairwise_align/DLPFC/figures/'
 # # Example: Multiple pairs evaluation
 keys=["Class-wise Dice Coefficient","Spatial Cross-Correlation", "Mean Centroid Shift","Mutual Information","SSIM","NCC"]
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/original/DLPFC/",keys,"orig")
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/simpleITK/DLPFC/marker_free/",keys,"vispro_itk")
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/simpleITK/DLPFC/with_marker/",keys,"original_itk")
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/nicetrans/DLPFC/",keys,"nicetrans")
-average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/ours/DLPFC/attention_fusion/regu2/",keys,"attentionfusion")
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/PASTE/DLPFC/",keys,'paste')
-# average_results = evaluate_multiple_pairs("/home/huifang/workspace/code/registration/result/ours/DLPFC/hvg_smoothed/",keys,'smoothed')
-print("Average Evaluation Results Across Multiple Pairs:", average_results)
+# print('Unaligned')
+# average_results = evaluate_multiple_pairs("/mnt/data/registration/result/pairwise_align/DLPFC/initial/",keys,"initial")
+# print('SimpleITK')
+# average_results = evaluate_multiple_pairs("/mnt/data/registration/result/pairwise_align/DLPFC/simpleitk/",keys,"simpleitk")
+# print('PASTE')
+# average_results = evaluate_multiple_pairs("/mnt/data/registration/result/pairwise_align/DLPFC/paste/",keys,'paste')
+# print('GPSA')
+# average_results = evaluate_multiple_pairs("/mnt/data/registration/result/pairwise_align/DLPFC/GPSA/",keys,'paste')
+# print('Voxelmorph')
+# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/voxelmorph/",keys,'vxm')
+# print('Nicetrans')
+# average_results = evaluate_multiple_pairs("/mnt/data/registration/result/pairwise_align/DLPFC/nicetrans/",keys,'nicetrans')
+print('Ours')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/DLPFC/ours2_vis_best/",keys,"Ours2")
+

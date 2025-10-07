@@ -145,7 +145,80 @@ def split_and_save_by_slide_and_region(adata, out_dir):
             region_data.write(file_path)
             print(f"Saved: {file_path}")
 
-adata = sc.read_h5ad("/media/huifang/data/sennet/codex/20250603_sennet_annotated_updated_donormeta.h5ad")
+def plot_marker_distribution(subset,marker):
+    # Plot
+    x_range = subset['x'].max() - subset['x'].min()
+    y_range = subset['y'].max() - subset['y'].min()
+    aspect_ratio = y_range / x_range
+
+    # Scale the figure width, height accordingly
+    fig_width = x_range / 500  # or any base width you like
+    fig_height = fig_width * aspect_ratio
+
+    plt.figure(figsize=(fig_width, fig_height))
+    sc = plt.scatter(
+        subset['x'],
+        subset['y'],
+        c=subset[marker],
+        cmap='viridis',
+        s=2,
+        alpha=0.7
+    )
+    plt.colorbar(sc, label=f'{marker} intensity')
+    plt.axis('equal')
+    name = f'{marker} on Slide: {slide_name} | Region: {selected_region} | Sample: {sample_id[0]}'
+    plt.title(name, fontsize=fig_width * 1.5)
+    plt.tight_layout()
+    plt.show()
+    # out_path = os.path.join("/media/huifang/data/sennet/codex/layout_figures", name+'.png')
+    # plt.savefig(out_path, dpi=300)
+    # plt.close()
+    # # print('saved')
+    # # test = input()
+
+def plot_marker_value_distribution():
+    # Collect first 6 slides
+    n_slides = 6
+    slides = list(islice(adata_by_slide.items(), n_skip, n_skip + n_slides))
+
+    for marker in markers:
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10), sharex=True, sharey=True)
+        axes = axes.flatten()
+
+        for ax, (slide_name, slide_adata) in zip(axes, slides):
+            regions = slide_adata.obs['unique_region'].unique().tolist()
+
+            for selected_region in regions:
+                subset = slide_adata.obs[slide_adata.obs['unique_region'] == selected_region]
+                sample_id = subset['sample'].unique().tolist()
+                if len(sample_id) > 1:
+                    print(f"Error in sample id for {slide_name}-{selected_region}")
+                    continue
+
+                values = subset[marker].dropna()
+                if len(values) == 0:
+                    continue
+
+                sns.kdeplot(
+                    values,
+                    fill=False,
+                    ax=ax,
+                    label=selected_region,
+                    linewidth=2
+                )
+
+            ax.set_title(f"Slice: {slide_name}")
+            ax.set_xlabel(f"{marker} intensity")
+            ax.set_ylabel("Density")
+            ax.set_ylim(0, 3)  # <-- fixed y-axis
+            ax.legend(fontsize=8)
+
+        plt.suptitle(f"Distribution of {marker} intensity across slices & regions", fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.97])  # leave space for suptitle
+        plt.show()
+
+
+adata = sc.read_h5ad("/mnt/data/sennet/codex/20250603_sennet_annotated_updated_donormeta.h5ad")
 # split_and_save_by_slide_and_region(adata,'/media/huifang/data/sennet/codex/regional_data/')
 
 
@@ -157,54 +230,71 @@ slide_names = adata.obs['slide_name'].unique()
 adata_by_slide = {name: adata[adata.obs['slide_name'] == name].copy() for name in slide_names}
 # save_to_file(adata_by_slide)
 n_skip = 0  # number of slides to skip
-for slide_name, slide_adata in islice(adata_by_slide.items(), n_skip, None):
-    print(slide_name)
+# marker = 'p53'
+# markers = ['DAPI', 'p53', 'p16', 'pH2AX', 'HSP47', 'PD1', 'PDL1', 'CD32b', 'SPP1', 'CD23']
+markers = ['p16']
 
+for slide_name, slide_adata in islice(adata_by_slide.items(), n_skip, None):
     # print(slide_adata)
     regions = slide_adata.obs['unique_region'].unique().tolist()
-    for selected_region in regions:
-        print(selected_region)
-        # 'sample' --> xenium sample id
-        # Filter obs by region
-        subset = slide_adata.obs[slide_adata.obs['unique_region']==selected_region]
-        sample_id = subset['sample'].unique().tolist()
-        if len(sample_id)>1:
-            print('Error in smaple id!')
-           # Choose marker
-        # marker = 'p53'
-        # markers = ['DAPI', 'p53', 'p16', 'pH2AX', 'HSP47', 'PD1', 'PDL1', 'CD32b', 'SPP1', 'CD23']
-        markers=['p16']
-        for marker in markers:
-            # Plot
-            x_range = subset['x'].max() - subset['x'].min()
-            y_range = subset['y'].max() - subset['y'].min()
-            aspect_ratio = y_range / x_range
+    print(slide_adata)
+    x = slide_adata.obs['x']
+    print(x)
+    test = input()
+    for marker in markers:
+        plt.figure(figsize=(10, 7))
 
-            # Scale the figure width, height accordingly
-            fig_width = x_range / 500  # or any base width you like
-            fig_height = fig_width * aspect_ratio
+        for selected_region in regions:
+            subset = slide_adata.obs[slide_adata.obs['unique_region'] == selected_region]
+            sample_id = subset['sample'].unique().tolist()
+            if len(sample_id) > 1:
+                print("Error in sample id!")
+                continue
 
+            values = subset[marker].dropna()
+            if len(values) == 0:
+                continue
 
-            plt.figure(figsize=(fig_width, fig_height))
-            sc = plt.scatter(
-                subset['x'],
-                subset['y'],
-                c=subset[marker],
-                cmap='viridis',
-                s=2,
-                alpha=0.7
+            sns.kdeplot(
+                values,
+                fill=False,
+                label=f"{selected_region} (Sample {sample_id[0]})",
+                linewidth=2
             )
-            plt.colorbar(sc, label=f'{marker} intensity')
-            plt.axis('equal')
-            name = f'{marker} on Slide: {slide_name} | Region: {selected_region} | Sample: {sample_id[0]}'
-            plt.title(name,fontsize=fig_width*1.5)
-            plt.tight_layout()
-            # plt.show()
-            out_path = os.path.join("/media/huifang/data/sennet/codex/layout_figures", name+'.png')
-            plt.savefig(out_path, dpi=300)
-            plt.close()
-            # print('saved')
-            # test = input()
+
+        plt.xlabel(f"{marker} intensity")
+        plt.ylabel("Density")
+        plt.title(f"Distribution of {marker} intensity across regions\nSlide: {slide_name}")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+
+
+
+
+
+    # for selected_region in regions:
+    #     print(selected_region)
+    #     # 'sample' --> xenium sample id
+    #     # Filter obs by region
+    #     subset = slide_adata.obs[slide_adata.obs['unique_region']==selected_region]
+    #     sample_id = subset['sample'].unique().tolist()
+    #     if len(sample_id)>1:
+    #         print('Error in smaple id!')
+    #        # Choose marker
+    #
+    #     for marker in markers:
+    #         values = subset[marker].dropna()  # remove NaNs if any
+    #
+    #         plt.figure(figsize=(6, 4))
+    #         plt.hist(values, bins=50, color='skyblue', edgecolor='black', alpha=0.7)
+    #         plt.xlabel(f'{marker} intensity')
+    #         plt.ylabel('Cell count')
+    #         plt.title(f'Distribution of {marker} intensity\nSlide: {slide_name} | Region: {selected_region} | Sample: {sample_id[0]}')
+    #         plt.tight_layout()
+    #         plt.show()
+
 
 
 
