@@ -8,11 +8,12 @@ import alphashape
 import seaborn as sns
 ### ----------------------- FILE LOADING FUNCTION -----------------------
 
-def load_data_from_folder(folder_path):
+def load_data_from_folder(folder_path,case):
     """Load image and spot data from a given folder."""
-    offset=5
-    data = np.load(folder_path)
 
+
+    offset= 50
+    data = np.load(folder_path)
 
     pts1 = data["pts1"]  # shape (4200, 2)
     pts2 = data["pts2"]
@@ -20,6 +21,7 @@ def load_data_from_folder(folder_path):
     # normalize pts1 to [0, 10]
     min_vals = pts1.min(axis=0)
     max_vals = pts1.max(axis=0)
+
     scale = max_vals-min_vals
 
     pts_combined = np.vstack([pts1, pts2])
@@ -27,14 +29,30 @@ def load_data_from_folder(folder_path):
     min_vals = pts_combined.min(axis=0)
 
 
-    pts1_norm = (pts1 - min_vals) / scale * 100+offset
-    pts2_norm = (pts2 - min_vals) / scale * 100+offset
+
+    pts1_norm = (pts1 - min_vals) / scale * 1000+offset
+    pts2_norm = (pts2 - min_vals) / scale * 1000+offset
 
     # combine along rows
     pts_combined = np.vstack([pts1_norm, pts2_norm])
-    mask_shape = np.ceil(pts_combined.max(axis=0)).astype(np.uint8)+offset
+    mask_shape = np.ceil(pts_combined.max(axis=0))+offset
+    mask_shape = mask_shape.astype(int)
 
-    return pts1_norm, pts2_norm, data["label1"].reshape(-1), data["label2"].reshape(-1),mask_shape
+
+    if case == "gpsa":
+        label1 = np.load("/media/huifang/data/registration/breast/0_0_marker_label_gpsa.npz")["label"]
+        label2 = np.load("/media/huifang/data/registration/breast/0_1_marker_label_gpsa.npz")["label"]
+    elif case == "paste":
+        label1 = np.load("/media/huifang/data/registration/breast/0_0_marker_label_paste.npz")["label"]
+        label2 = np.load("/media/huifang/data/registration/breast/0_1_marker_label_paste.npz")["label"]
+    elif case == "santo":
+        label1 = np.load("/media/huifang/data/registration/breast/0_0_marker_label_santo.npz")["label"]
+        label2 = np.load("/media/huifang/data/registration/breast/0_1_marker_label_santo.npz")["label"]
+    else:
+        label1 = np.load("/media/huifang/data/registration/breast/0_0_marker_label_img.npz")["label"]
+        label2 = np.load("/media/huifang/data/registration/breast/0_1_marker_label_img.npz")["label"]
+
+    return pts1_norm, pts2_norm, label1.reshape(-1), label2.reshape(-1),mask_shape
 
 ### ----------------------- SPOT EVALUATION FUNCTIONS -----------------------
 
@@ -57,9 +75,9 @@ def plot_spatial_correlation(coords_A, labels_A, coords_B, labels_B, density_A, 
 
     for idx, c in enumerate(unique_classes):
         # Scatter plots of raw points
-        axes[0, idx].scatter(coords_A[labels_A == c][:, 0], coords_A[labels_A == c][:, 1], color='red', s=10,
+        axes[0, idx].scatter(coords_A[labels_A == c][:, 0], coords_A[labels_A == c][:, 1], color='red', s=0.5,
                              label=f"Class {c} (A)")
-        axes[0, idx].scatter(coords_B[labels_B == c][:, 0], coords_B[labels_B == c][:, 1], color='blue', s=10,
+        axes[0, idx].scatter(coords_B[labels_B == c][:, 0], coords_B[labels_B == c][:, 1], color='blue', s=0.5,
                              label=f"Class {c} (B)")
         axes[0, idx].set_xlim([0, grid_size])
         axes[0, idx].set_ylim([0, grid_size])
@@ -183,14 +201,28 @@ def get_mask(boundary,shape):
         mask[rr, cc] = 1  # Fill the region
     return mask
 
-def create_boundary_mask(coords, shape, alpha=0.5):
+# def create_boundary_mask(coords, shape, alpha=0.5):
+#     if len(coords) < 3:
+#         return None  # A polygon cannot be formed
+#     boundary = alphashape.alphashape(coords, alpha)
+#     # Handle different geometry types
+#     mask = get_mask(boundary,shape)
+#
+#
+#     return boundary,mask
+from sklearn.neighbors import NearestNeighbors
+def create_boundary_mask(coords, shape, alpha=0.5, neighbor_k=5, neighbor_thresh=0.05):
     if len(coords) < 3:
-        return None  # A polygon cannot be formed
-    boundary = alphashape.alphashape(coords, alpha)
-    # Handle different geometry types
-    mask = get_mask(boundary,shape)
+        return None, None
 
-    return boundary,mask
+    coords = np.asarray(coords)
+
+    # ---- Step 1: filter isolated points ----
+    nbrs = NearestNeighbors(n_neighbors=min(neighbor_k, len(coords))).fit(coords)
+    distances, _ = nbrs.kneighbors(coords)
+    boundary = alphashape.alphashape(coords, alpha)
+    mask = get_mask(boundary, shape)
+    return boundary, mask
 
 def dice_coefficient(mask_A, mask_B):
     intersection = np.sum(mask_A & mask_B)
@@ -198,29 +230,7 @@ def dice_coefficient(mask_A, mask_B):
 
     return (2. * intersection) / sum_masks if sum_masks > 0 else 0.0
 
-def get_region_meta_data(coords, labels, mask_shape, alpha=0.01):
-    labels_ = np.unique(labels)
-    regions={}
-    for class_label in labels_:
-        if np.isnan(class_label):
-            continue
-        classid = (labels == class_label)
-        region_coords = coords[classid]
-        boundary, mask = create_boundary_mask(region_coords, mask_shape, alpha)
 
-        # compute centers
-        cx, cy = get_centroid(mask)
-
-        # visualize
-        #
-        # plt.imshow(mask, cmap="gray")
-        # plt.scatter(region_coords[:,0],region_coords[:,1])
-        # plt.scatter(cx, cy, c="red", s=50, marker="x")
-        # plt.show()
-
-        regions[class_label] = (region_coords, mask,boundary, cx,cy)
-
-    return regions
 
 
 def visualize_centroid_shift(region_A, region_B, shifts,region_mean_shift,save_suffix,save):
@@ -232,7 +242,7 @@ def visualize_centroid_shift(region_A, region_B, shifts,region_mean_shift,save_s
         region_masks_A: Dictionary mapping class labels to (coordinates, region labels) for dataset A.
         region_masks_B: Dictionary mapping class labels to (coordinates, region labels) for dataset B.
     """
-    plt.figure(figsize=(12, 9))
+    plt.figure(figsize=(24, 18))
     common_labels = set(region_A.keys()) & set(region_B.keys())
     colors = sns.color_palette("tab10", n_colors=len(common_labels))
 
@@ -244,15 +254,15 @@ def visualize_centroid_shift(region_A, region_B, shifts,region_mean_shift,save_s
         color = colors[idx]
 
         # Plot original scatter points
-        plt.scatter(coords_a[:, 0], coords_a[:, 1], color=color, marker="o",  s=10, alpha=0.6)
-        plt.scatter(coords_b[:, 0], coords_b[:, 1], color=color,  marker="s",s=10, alpha=0.6)
+        plt.scatter(coords_a[:, 0], coords_a[:, 1], color=color, marker="o",  s=0.1, alpha=0.6)
+        plt.scatter(coords_b[:, 0], coords_b[:, 1], color=color,  marker="s",s=0.1, alpha=0.6)
         # plot_boundary(boundary_a, color)
         # plot_boundary(boundary_b, color)
 
         # Plot centroids
-        plt.scatter(cx_a, cy_a, edgecolor='black', color=color, marker="o", s=200,
+        plt.scatter(cx_a, cy_a, edgecolor='black', color=color, marker="o", s=0.1,
                     label=f"Region {label} - Centroid A")
-        plt.scatter(cx_b, cy_b, edgecolor='black', color=color, marker="s", s=200,
+        plt.scatter(cx_b, cy_b, edgecolor='black', color=color, marker="s", s=0.1,
                     label=f"Region {label} - Centroid B")
 
 
@@ -306,7 +316,7 @@ def visualize_dice_regions(region_A, region_B, dice_scores, average_dice_score,s
         dice_scores: Dictionary of Dice scores for each matched region pair.
         alpha (float): Alpha parameter for boundary tightness.
     """
-    plt.figure(figsize=(12, 9))
+    plt.figure(figsize=(24, 18))
     plt.rcParams.update({'font.size': 20})
     import seaborn as sns
 
@@ -321,8 +331,8 @@ def visualize_dice_regions(region_A, region_B, dice_scores, average_dice_score,s
         color = colors[idx]  # Assign different colors for each class
 
         # Scatter plot of original points (A and B with different markers)
-        plt.scatter(coords_a[:, 0], coords_a[:, 1], color=color, alpha=0.5, s=10, label=f"Region {label} (A)")
-        plt.scatter(coords_b[:, 0], coords_b[:, 1], color=color, alpha=0.5, s=10, marker="x", label=f"Region {label} (B)")
+        plt.scatter(coords_a[:, 0], coords_a[:, 1], color=color, alpha=0.5, s=0.1, label=f"Region {label} (A)")
+        plt.scatter(coords_b[:, 0], coords_b[:, 1], color=color, alpha=0.5, s=0.1, marker="x", label=f"Region {label} (B)")
 
         # Overlay boundaries with transparency
 
@@ -355,6 +365,36 @@ def visualize_dice_regions(region_A, region_B, dice_scores, average_dice_score,s
         # plt.savefig('/home/huifang/workspace/code/fiducial_remover/paper_figures/figures/20.png', dpi=300)
         plt.show()
 
+def get_region_meta_data(coords,  labels, mask_shape,alpha=0.01):
+
+    # labels_ = np.unique(labels)
+    labels_= list(range(1,21))
+    # labels_ = [1, 2, 3, 4]
+    regions={}
+    for class_label in labels_:
+        if np.isnan(class_label):
+            continue
+        classid = (labels == class_label)
+        region_coords = coords[classid]
+        if class_label==6:
+            boundary, mask = create_boundary_mask(region_coords, mask_shape, 0.1)
+        else:
+            boundary, mask = create_boundary_mask(region_coords, mask_shape, alpha)
+
+
+        # compute centers
+        cx, cy = get_centroid(mask)
+        #
+        # # visualize
+        # plt.figure(figsize=(15,15))
+        # plt.imshow(mask, cmap="gray")
+        # plt.scatter(region_coords[:,0],region_coords[:,1])
+        # plt.scatter(cx, cy, c="red", s=1, marker="x")
+        # plt.show()
+
+        regions[class_label] = (region_coords, mask,boundary, cx,cy)
+
+    return regions
 
 ### ----------------------- MAIN EVALUATION FUNCTIONS -----------------------
 def compute_region_dice_score(coords_A, labels_A, coords_B, labels_B, save_suffix,mask_shape=(100, 100), alpha=0.01,visualize=True,save=True):
@@ -406,7 +446,7 @@ def check_labels(coords,labels):
     plt.figure()
 
     # Scatter all points, colored by their label
-    scatter_plot = plt.scatter(coords[:, 0], coords[:, 1], s=10,c=labels)
+    scatter_plot = plt.scatter(coords[:, 0], coords[:, 1], s=0.1,c=labels)
 
     unique_labels = np.unique(labels)
     for lab in unique_labels:
@@ -430,32 +470,22 @@ def check_labels(coords,labels):
 def evaluate_single_pair(folder_path,i,j,suffix):
 
     figure_suffix = str(i)+"_"+str(j)+"_"+suffix
-    coords_A, coords_B, labels_A, labels_B,mask_shape_ = load_data_from_folder(folder_path)
-
-    if suffix == 'gpsa' or suffix =='santo':
-        pass
-    else:
-        labels_A = np.load("/media/huifang/data/registration/DLPFC/huifang/"+str(i)+"_"+str(j)+"_"+"region_label.npy")
-        labels_B = np.load("/media/huifang/data/registration/DLPFC/huifang/"+str(i)+"_"+str(j+1)+"_"+"region_label.npy")
-
-    check_labels(coords_A,labels_A)
-    check_labels(coords_B,labels_B)
-    if i ==0:
-        alpha_value = 0.05
-    else:
-        alpha_value = 0.1
+    coords_A, coords_B, labels_A, labels_B,mask_shape_ = load_data_from_folder(folder_path,suffix)
+    # check_labels(coords_A,labels_A)
+    # check_labels(coords_B, labels_B)
 
     scc_scores = spatial_cross_correlation(
-        coords_A, labels_A, coords_B, labels_B, visualize=False
+        coords_A, labels_A, coords_B, labels_B,grid_size=int(np.mean(mask_shape_)), visualize=False
     )
 
+    alpha_value = 0.01
     avg_dice, avg_shift = compute_region_dice_score(
         coords_A, labels_A, coords_B, labels_B,
         figure_suffix,
         mask_shape=mask_shape_,
         alpha=alpha_value,
         visualize=True,
-        save=False
+        save=True
     )
 
     results = {
@@ -463,16 +493,17 @@ def evaluate_single_pair(folder_path,i,j,suffix):
         "Mean Centroid Shift": avg_shift,
         "Spatial Cross-Correlation": scc_scores
     }
-    print(results)
+
     return results
 
 
 def evaluate_multiple_pairs(root_folder,keys,suffix):
     all_results = {key: [] for key in keys}
-    for i in range(1,3):
-        for j in range(4):
-            data_path = root_folder+str(i)+"_"+str(j)+"_result.npz"
-            results = evaluate_single_pair(data_path,i,j,suffix)
+    pairs=[[0,1]]
+    for group in range(1):
+        for pair in pairs:
+            data_path = root_folder+str(group)+"_"+str(pair[0])+"_"+str(pair[1])+"_result.npz"
+            results = evaluate_single_pair(data_path,pair[0],pair[1],suffix)
             for key in all_results:
                 all_results[key].append(results[key])
 
@@ -486,23 +517,27 @@ def evaluate_multiple_pairs(root_folder,keys,suffix):
 # Example: Single pair evaluation
 # single_results = evaluate_single_pair("/home/huifang/workspace/code/registration/result/original/DLPFC/0_0_result.npz")
 # print("Single Pair Evaluation Results:", single_results)
-result_root='/media/huifang/data/registration/result/pairwise_align/DLPFC/figures/'
+result_root='/media/huifang/data/registration/result/xenium/breast/figures/'
 # # Example: Multiple pairs evaluation
 keys=["Class-wise Dice Coefficient","Spatial Cross-Correlation", "Mean Centroid Shift"]
 print('Unaligned')
-average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/DLPFC/initial/",keys,"initial")
-# print('SimpleITK')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/simpleitk/",keys,"simpleitk")
-# print('PASTE')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/paste/",keys,'paste')
-# print('GPSA')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/GPSA/",keys,'gpsa')
-# print('SANTO')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/SANTO/",keys,'santo')
-# print('Voxelmorph')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/voxelmorph/",keys,'vxm')
-# print('Nicetrans')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/nicetrans/",keys,'nicetrans')
-# print('Ours')
-# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/DLPFC/ours2_vis_best/",keys,"Ours2")
-
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/initial/1024/",keys,"initial_1024")
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/initial/2048/",keys,"initial_2048")
+print('SimpleITK')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/simpleitk/1024/",keys,"simpleitk_1024")
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/simpleitk/2048/",keys,"simpleitk_2048")
+print('PASTE')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/paste/",keys,'paste')
+print('GPSA')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/gpsa/downsample2/",keys,'gpsa')
+print('SANTO')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/SANTO/downsample4/",keys,'santo')
+print('Voxelmorph')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/vxm/1024/",keys,'vxm_1024')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/vxm/2048/",keys,'vxm_2048')
+print('Nicetrans')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/nicetrans/1024/",keys,'nicetrans_1024')
+average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/breast/nicetrans/2048/",keys,'nicetrans_2048')
+print('Ours')
+average_results = evaluate_multiple_pairs("//media/huifang/data/registration/result/xenium/breast/ours/1024/",keys,"Ours_1024")
+average_results = evaluate_multiple_pairs("//media/huifang/data/registration/result/xenium/breast/ours/2048/",keys,"Ours_2048")

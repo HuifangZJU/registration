@@ -717,7 +717,7 @@ for i in range(1,3):
     print(adata_full)
     adata_fused = spatial_regrid_fuse_gpu_robust(
         adata_full,
-        grid_size=1,
+        grid_size=1.5,
         fuse_radius=5,  # ~1.5–2.0 * grid_size works well
         keep_nuc_frac=0.6,
         knee_mode=False,

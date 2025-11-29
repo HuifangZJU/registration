@@ -41,7 +41,7 @@ def plot_clusters(adata, col, title = ''):
 def crop_square_then_resize_square(
     img: Image.Image,
     original_uv: np.ndarray,
-    crop_para
+    crop_para,
 ):
     # 1) Crop the square from the original image
     #    crop box = (left, top, right, bottom)
@@ -63,7 +63,7 @@ def crop_square_then_resize_square(
     scale = final_size / side_length
     final_uv = shifted_uv * scale
 
-    return final_img, final_uv
+    return cropped_img,final_img, final_uv
 
 
 
@@ -104,13 +104,15 @@ def load_layer(patient, sample, metadata,crop_para):
     # plt.scatter(new_spatial[:, 0], new_spatial[:, 1])
     # plt.show()
 
-    cropped_image,cropped_coor = crop_square_then_resize_square(image,image_coor,crop_para)
+    cropped_img,resized_image,cropped_coor = crop_square_then_resize_square(image,image_coor,crop_para)
+    cropped_img.save(f"../data/SCC/scc_p{patient}_layer{sample}_cropped.jpg")
+
 
     # plt.imshow(cropped_image)
     # plt.scatter(cropped_coor[:,0],cropped_coor[:,1])
     # plt.show()
     adata.obsm['spatial_image_coor'] = cropped_coor
-    adata.uns["image_array"] = np.asarray(cropped_image)
+    adata.uns["image_array"] = np.asarray(resized_image)
     metadata_idx = ['P' + str(patient) + '_' + i + '_' + str(sample) for i in idx]
     adata.obs['original_clusters'] = [str(x) for x in list(metadata.loc[metadata_idx, 'SCT_snn_res.0.8'])]
     return adata
@@ -138,6 +140,8 @@ def gen_h5file():
     adata_10_2 = load_layer(10, 2, metadata, (2700,3300,10000,1024))
     adata_10_3 = load_layer(10, 3, metadata, (4000,3600,9000,1024))
     patient_10 = [adata_10_1, adata_10_2, adata_10_3]
+
+
 
     patients = {
         "patient_2": patient_2,
@@ -404,8 +408,6 @@ patients = {
 for k in patients.keys():
     for i in range(3):
         data = sc.read_h5ad(path_to_h5ads + k + '_slice_' + str(i) + '.h5ad')
-
-
         patients[k].append(sc.read_h5ad(path_to_h5ads + k + '_slice_' + str(i) + '.h5ad'))
 # for k, slices in patients.items():
 #     for adata, s in zip(slices, ['Slice A', 'Slice B', 'Slice C']):

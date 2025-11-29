@@ -901,7 +901,7 @@ new_extent = mtransforms.Bbox.from_extents(
 # print(new_extent)
 # test = input()
 
-fig.savefig('/home/huifang/workspace/code/fiducial_remover/paper_figures/figures/16.png', bbox_inches=new_extent,dpi=300)
+# fig.savefig('/home/huifang/workspace/code/fiducial_remover/paper_figures/figures/16.png', bbox_inches=new_extent,dpi=300)
 # plt.savefig('/home/huifang/workspace/code/fiducial_remover/paper_figures/figures/16.png', dpi=300)
 plt.show()
 

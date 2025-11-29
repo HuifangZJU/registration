@@ -124,7 +124,7 @@ def spatial_regrid_fuse_gpu_robust(
     fuse_radius: float = None,
     k_mask: int = 64,
     alpha: float = 0.5,
-    pca_dim: int = 32,
+    pca_dim: int = 64,
     outer_loops: int = 2,
     # adaptive rank controls (pick ONE behavior):
     keep_nuc_frac: float = 0.90,   # keep 90% of nuclear norm (soft shrink)

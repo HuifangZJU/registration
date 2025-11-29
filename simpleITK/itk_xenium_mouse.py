@@ -81,100 +81,101 @@ def transform_uv_with_displacement(uv_coords, deformation_field):
 
 import os
 root = "/media/huifang/data/registration"
-datalist = "imglist/scc_imglist/pairwise_align_test.txt"
+datalist = "imglist/xenium_imglist/test.txt"
 datapath = os.path.join(root, datalist)
 f = open(datapath, 'r')
 lines = f.readlines()
-prefix=['2_0','2_1','5_0','5_1','9_0','9_1','10_0','10_1']
+prefix=['0_0_1','0_1_2','0_0_2','1_0_1','1_1_2','1_0_2']
+base_size=2048
 for i in range(len(lines)):
 
     data_pair = lines[i].strip()
     data_pair = data_pair.split(' ')
-    fixed_image_path = root + data_pair[0] + '_image_512.png'
-    moving_image_path = root + data_pair[1] + '_image_512.png'
+    fixed_image_path = root + data_pair[0] + f'_image_{base_size}.png'
+    moving_image_path = root + data_pair[1] + f'_image_{base_size}.png'
     displacement_field,fixed_image,moving_image, warped_image = get_simpleITK_transformation(fixed_image_path,moving_image_path)
     print('calculation is done, perform transformations..')
 
-    fixed_val = np.load(root + data_pair[0] + '_validation.npz')
+    fixed_val = np.load(root + data_pair[0] + f'_validation_{base_size}.npz')
     fixed_pts = fixed_val["coord"]
     fixed_label = fixed_val["label"]
 
-    moving_val = np.load(root + data_pair[1] + '_validation.npz')
+    moving_val = np.load(root + data_pair[1] + f'_validation_{base_size}.npz')
     moving_pts = moving_val["coord"]
     moving_label = moving_val["label"]
 
     # warped_pts = moving_pts
     warped_pts = transform_uv_with_displacement(moving_pts, displacement_field)
     #
-    # np.savez("/media/huifang/data/registration/result/pairwise_align/SCC/simpleitk/" + prefix[i] + "_result", pts1=fixed_pts,pts2=warped_pts,img1=fixed_image,img2=warped_image,label1=fixed_label,label2=moving_label)
-    # np.savez("/media/huifang/data/registration/result/pairwise_align/SCC/initial/" + prefix[i] + "_result", pts1=fixed_pts, pts2=moving_pts,img1=fixed_image, img2=moving_image, label1=fixed_label, label2=moving_label)
+    np.savez("/media/huifang/data/registration/result/xenium/simpleitk/" + prefix[i] + "_result", pts1=fixed_pts,pts2=warped_pts,img1=fixed_image,img2=warped_image,label1=fixed_label,label2=moving_label)
+    np.savez("/media/huifang/data/registration/result/xenium/initial/" + prefix[i] + "_result", pts1=fixed_pts, pts2=moving_pts,img1=fixed_image, img2=moving_image, label1=fixed_label, label2=moving_label)
 
 
-
-
-    f, a = plt.subplots(1, 3, figsize=(10, 5))
-    # Show warped image 1 with transformed points
-    a[0].imshow(fixed_image)
-
-    a[0].scatter(fixed_pts[:, 0], fixed_pts[:, 1], c=fixed_label, cmap='tab10', s=5,
-                    label="Slice 1")
-    a[0].set_title("Image 1 with Original Points")
-    a[0].legend()
-
-    # Show warped image 2 with transformed points
-    a[1].imshow(moving_image)
-    a[1].scatter(moving_pts[:, 0], moving_pts[:, 1],c=moving_label, cmap='tab10', s=5,
-                    label="Slice 2")
-    a[1].set_title("Image 2 with Original Points")
-    a[1].legend()
-
-
-    # Show warped image 2 with transformed points
-    a[2].imshow(warped_image)
-    a[2].scatter(warped_pts[:, 0], warped_pts[:, 1], c=moving_label, cmap='tab10', s=5,
-                 label="Adjusted Warped Slice 2")
-    a[2].set_title("Warped Image 2 with Transformed Points")
-    a[2].legend()
-
-    plt.show()
-    # #
-    # #
-    # #
-    # #
-    # #
-    # # Overlay images
-    img_before_registration = cv2.addWeighted(fixed_image, 0.5, moving_image, 0.5, 0)
-    blended_image = cv2.addWeighted(fixed_image, 0.5, warped_image, 0.5, 0)
-
-    # Create subplots
-    f, a = plt.subplots(2, 2, figsize=(10, 10))
-
-    # Scatter plot of original points
-    a[0, 0].scatter(fixed_pts[:, 0], fixed_pts[:, 1], c=fixed_label, cmap='tab10',label="Slice 1", alpha=0.6)
-    a[0, 0].scatter(moving_pts[:, 0], moving_pts[:, 1], c=moving_label, cmap='tab10',label="Slice 2", alpha=0.6)
-    a[0, 0].invert_yaxis()  # Match image coordinate system
-    a[0, 0].set_title("Original Points")
-    a[0, 0].set_aspect('equal')
-    a[0, 0].legend()
-
-    # Scatter plot of warped (transformed) points
-    a[0, 1].scatter(fixed_pts[:, 0], fixed_pts[:, 1],c=fixed_label, cmap='tab10', label="Warped Slice 1", alpha=0.6)
-    a[0, 1].scatter(warped_pts[:, 0], warped_pts[:, 1],c=moving_label, cmap='tab10', label="Warped Slice 2", alpha=0.6)
-    a[0, 1].invert_yaxis()
-    a[0, 1].set_title("Warped Points")
-    a[0, 1].set_aspect('equal')
-    a[0, 1].legend()
-    # Show overlayed images
-    a[1, 0].imshow(img_before_registration)
-    a[1, 0].set_title("Before Registration")
-    a[1, 0].axis("off")  # Hide axes
-
-    # Show overlayed images
-    a[1, 1].imshow(blended_image)
-    a[1, 1].set_title("After Registration")
-    a[1, 1].axis("off")  # Hide axes
-
-
-    plt.tight_layout()
-    plt.show()
+    #
+    #
+    # f, a = plt.subplots(1, 3, figsize=(10, 5))
+    # # Show warped image 1 with transformed points
+    # a[0].imshow(fixed_image)
+    #
+    # a[0].scatter(fixed_pts[:, 0], fixed_pts[:, 1], c=fixed_label, cmap='tab10', s=2,
+    #                 label="Slice 1")
+    # a[0].set_title("Image 1 with Original Points")
+    # a[0].legend()
+    #
+    # # Show warped image 2 with transformed points
+    # a[1].imshow(moving_image)
+    # a[1].scatter(moving_pts[:, 0], moving_pts[:, 1],c=moving_label, cmap='tab10', s=2,
+    #                 label="Slice 2")
+    # a[1].set_title("Image 2 with Original Points")
+    # a[1].legend()
+    #
+    #
+    # # Show warped image 2 with transformed points
+    # a[2].imshow(warped_image)
+    # a[2].scatter(warped_pts[:, 0], warped_pts[:, 1], c=moving_label, cmap='tab10', s=2,
+    #              label="Adjusted Warped Slice 2")
+    # a[2].set_title("Warped Image 2 with Transformed Points")
+    # a[2].legend()
+    #
+    # plt.show()
+    # # #
+    # # #
+    # # #
+    # # #
+    # # #
+    # # # Overlay images
+    # img_before_registration = cv2.addWeighted(fixed_image, 0.5, moving_image, 0.5, 0)
+    # blended_image = cv2.addWeighted(fixed_image, 0.5, warped_image, 0.5, 0)
+    #
+    # # # Create subplots
+    # f, a = plt.subplots(2, 2, figsize=(10, 10))
+    #
+    # # Scatter plot of original points
+    # a[0, 0].scatter(fixed_pts[:, 0], fixed_pts[:, 1], c=fixed_label, cmap='tab10',label="Slice 1", alpha=0.6)
+    # a[0, 0].scatter(moving_pts[:, 0], moving_pts[:, 1], c=moving_label, cmap='tab10',label="Slice 2", alpha=0.6)
+    # a[0, 0].invert_yaxis()  # Match image coordinate system
+    # a[0, 0].set_title("Original Points")
+    # a[0, 0].set_aspect('equal')
+    # a[0, 0].legend()
+    #
+    # # Scatter plot of warped (transformed) points
+    # a[0, 1].scatter(fixed_pts[:, 0], fixed_pts[:, 1],c=fixed_label, cmap='tab10', label="Warped Slice 1", alpha=0.6)
+    # a[0, 1].scatter(warped_pts[:, 0], warped_pts[:, 1],c=moving_label, cmap='tab10', label="Warped Slice 2", alpha=0.6)
+    # a[0, 1].invert_yaxis()
+    # a[0, 1].set_title("Warped Points")
+    # a[0, 1].set_aspect('equal')
+    # a[0, 1].legend()
+    # # Show overlayed images
+    # a[1, 0].imshow(img_before_registration)
+    # a[1, 0].set_title("Before Registration")
+    # a[1, 0].axis("off")  # Hide axes
+    #
+    # # Show overlayed images
+    # a[1, 1].imshow(blended_image)
+    # a[1, 1].set_title("After Registration")
+    # a[1, 1].axis("off")  # Hide axes
+    #
+    #
+    # plt.tight_layout()
+    # plt.show()
 

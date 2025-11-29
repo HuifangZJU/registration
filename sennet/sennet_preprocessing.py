@@ -16,6 +16,9 @@ def get_data_list(root):
 
 def get_subfolder_by_sampleid(data,sampleid):
     result = data.loc[data['sampleid'] == sampleid, 'subfolder']
+
+
+
     return result.values[0] if not result.empty else None
 
 def get_xenium_data(xenium_list, xenium_sampleid,xenium_regionid):
@@ -40,11 +43,11 @@ def get_xenium_data(xenium_list, xenium_sampleid,xenium_regionid):
 
 
 
-def get_codex_data(codex_list,codex_sampleid,codex_regionid):
+def get_codex_data(codex_sampleid,codex_regionid):
 
-    codex_subfolder_name = get_subfolder_by_sampleid(codex_list, codex_sampleid)
-    subfolder = os.path.join(codex_root_folder, codex_subfolder_name, 'per_tissue_region-selected')
+    subfolder = os.path.join(codex_root_folder, codex_sampleid, 'per_tissue_region-selected')
     img_path = subfolder + f"/{codex_regionid}_X01_Y01_Z01_channel0_half.png"
+
 
     cell_path = '/media/huifang/data/sennet/codex/regional_data/' + f"{codex_sampleid}_{codex_regionid}.h5ad"
     df = sc.read_h5ad(cell_path)
@@ -161,8 +164,48 @@ def clahe(dapi_img):
     return dilated
 
 
+def generate_pseudo_tissue_image(coords):
+    # --- Step 1: Define output image size ---
+    img_size = (512, 512)
+
+    # --- Step 2: Compute spatial range ---
+    x_min, y_min = coords.min(axis=0)
+    x_max, y_max = coords.max(axis=0)
+
+    # --- Step 3: Map coordinates to pixel indices ---
+    x_scaled = ((coords[:, 0] - x_min) / (x_max - x_min) * (img_size[1] - 1)).astype(int)
+    y_scaled = ((coords[:, 1] - y_min) / (y_max - y_min) * (img_size[0] - 1)).astype(int)
+
+    # --- Step 4: Count number of cells per grid (no blur) ---
+    density = np.zeros(img_size, dtype=np.int32)
+    for x, y in zip(x_scaled, y_scaled):
+        density[y, x] += 1  # note (y, x) order for image array
+
+    # --- Step 5: Normalize for visualization ---
+    density_norm = density / np.percentile(density, 99)
+    density_norm = np.clip(density_norm, 0, 1)
+
+    # --- Step 6: Show pseudo cell density image ---
+    plt.figure(figsize=(8, 8))
+    plt.imshow(density_norm, cmap='gray', origin='lower')
+    plt.axis('off')
+    plt.title("Pseudo Cell Density Map (No Smoothing)", fontsize=14)
+    plt.show()
+
+    # --- Step 8: Plot histogram of cell counts per pixel ---
+    counts = density.flatten()
+    counts_nonzero = counts[counts > 0]  # ignore empty pixels
+
+    plt.figure(figsize=(6, 4))
+    plt.hist(counts_nonzero, bins=50, color='steelblue', edgecolor='black')
+    plt.xlabel("Cells per grid (pixel)")
+    plt.ylabel("Number of grids")
+    plt.title("Distribution of Cell Counts per Grid", fontsize=12)
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
 xenium_list = get_data_list(xenium_root_folder)
-codex_list = get_data_list(codex_root_folder)
 # Replace with your actual file path
 file_path = '/media/huifang/data/sennet/xenium_codex_pairs.txt'
 
@@ -178,18 +221,26 @@ for i, row in enumerate(df.iloc[start_line:].itertuples(index=False, name=None))
         xenium_gene_data.obs['x_centroid'].values / 4,
         xenium_gene_data.obs['y_centroid'].values / 4
     ], axis=1)
-    codex_img,codex_gene_data = get_codex_data(codex_list, codex_sampleid, codex_regionid)
+
+    codex_img,codex_gene_data = get_codex_data(codex_sampleid, codex_regionid)
+
     codex_coordinate = np.stack([
         codex_gene_data.obs['x'].values / 2,
         codex_gene_data.obs['y'].values / 2
     ], axis=1)
+
+    plt.imshow(codex_img)
+    # plt.scatter(codex_coordinate[:,0],codex_coordinate[:,1])
+    plt.show()
+
+    # generate_pseudo_tissue_image(codex_coordinate)
 
     xenium_img,xenium_coordinate = flip_image(xenium_img,xenium_coordinate)
     xenium_img, xenium_coordinate, codex_img, codex_coordinate = prepare_images_on_shared_canvas(
         xenium_img, xenium_coordinate, codex_img, codex_coordinate)
 
     # show_pixel_value_distribution(xenium_img)
-
+    generate_pseudo_tissue_image(xenium_coordinate)
 
 
     # === Step 1: Overwrite coordinates in .obs ===
@@ -205,8 +256,8 @@ for i, row in enumerate(df.iloc[start_line:].itertuples(index=False, name=None))
     plt.show()
 
 
-    # save_single_dataset(xenium_img_enhanced, xenium_gene_data, 'xenium', xenium_sampleid, xenium_regionid,
-    #                     "/media/huifang/data/sennet/hf_aligned_data")
+    save_single_dataset(xenium_img_enhanced, xenium_gene_data, 'xenium', xenium_sampleid, xenium_regionid,
+                        "/media/huifang/data/sennet/hf_aligned_data")
     # save_single_dataset(codex_img_enhanced, codex_gene_data, 'codex', codex_sampleid, codex_regionid,
     #                     "/media/huifang/data/sennet/hf_aligned_data")
 

@@ -503,34 +503,7 @@ def evaluate_single_pair(folder_path,i,suffix):
     return results
 
 from sklearn.neighbors import NearestNeighbors
-def spotwise_topk_accuracy(coords_A, coords_B, labels_A, labels_B, dist_thresh=5.0):
-    """
-    Compute spot-wise label consistency between dataset A and B
-    using a distance threshold instead of k-NN.
-
-    For each spot in B, find all spots in A within dist_thresh,
-    then check whether the true label of B matches the majority of A's labels.
-
-    Parameters
-    ----------
-    coords_A : (nA, 2) np.ndarray
-        Spatial coordinates of dataset A
-    coords_B : (nB, 2) np.ndarray
-        Spatial coordinates of dataset B
-    labels_A : (nA,) np.ndarray
-        Integer labels for dataset A
-    labels_B : (nB,) np.ndarray
-        Integer labels for dataset B
-    dist_thresh : float
-        Distance threshold for defining neighbors
-
-    Returns
-    -------
-    acc_majority : float
-        Majority-vote accuracy (more intuitive for biologists)
-    acc_any : float
-        Relaxed accuracy (true label appears among neighbor labels)
-    """
+def spotwise_topk_accuracy(coords_A, coords_B, labels_A, labels_B, dist_thresh=4.0):
     coords_A = np.asarray(coords_A)
     coords_B = np.asarray(coords_B)
     labels_A = np.asarray(labels_A)

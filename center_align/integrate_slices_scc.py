@@ -595,7 +595,7 @@ def normalize_coords(coords, offset=5):
     scale = max_vals - min_vals
     return (coords - min_vals) / scale * 100 + offset
 
-def compare_original_vs_fused(adata_original, adata_fused, save_suffix, n_top_genes=2000, n_pcs=30, n_neighbors=15):
+def compare_original_vs_fused(adata_original, adata_fused, save_suffix=None, n_top_genes=2000, n_pcs=30, n_neighbors=15):
     """
     Cluster integrated ST data (adata_fused) into the same number of clusters as adata_original,
     then show side-by-side spatial distributions.
@@ -664,8 +664,10 @@ def compare_original_vs_fused(adata_original, adata_fused, save_suffix, n_top_ge
     axes[1].set_xlabel("X")
 
     plt.tight_layout()
-    plt.savefig(result_root + "spatial_coherence_" + save_suffix + ".png", dpi=300, bbox_inches='tight')
-    # plt.show()
+    if save_suffix:
+        plt.savefig(result_root + "spatial_coherence_" + save_suffix + ".png", dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
 
 
 
@@ -750,14 +752,14 @@ def plot_stl_score(adata):
     plt.show()
 
 
-for method in ['initial','nicetrans','ours1','paste','SANTO','simpleitk','voxelmorph']:
-    method = 'ours1'
+for method in ['ours1','nicetrans','initial','paste','SANTO','simpleitk','voxelmorph']:
+
     print(method)
     root_folder = f"/media/huifang/data/registration/result/center_align/SCC/{method}/"
     gene_folder="/home/huifang/workspace/code/registration/data/SCC/cached-results/H5ADs"
     result_root = "/media/huifang/data/registration/result/center_align/SCC/figures/"
 
-    for i in [9]:
+    for i in [2]:
         print(i)
         fix_adata_path = f"{gene_folder}/patient_{i}_slice_0.h5ad"
         registration_paths = [
@@ -769,7 +771,7 @@ for method in ['initial','nicetrans','ours1','paste','SANTO','simpleitk','voxelm
             f"{gene_folder}/patient_{i}_slice_2.h5ad",
         ]
 
-        genes = ['COL17A1', 'KRT1']
+        genes = ['COL17A1', 'KRT1','IGFBP2','CCNB1','CXCL12','IL2RB']
         adata_single = sc.read_h5ad(fix_adata_path)
         adata_fixed,adata_pool,adata_full = integrate_slices(fix_adata_path, moving_adata_paths, registration_paths)
         # exprs = load_gene_expression(adata_fixed, genes)
@@ -786,7 +788,7 @@ for method in ['initial','nicetrans','ours1','paste','SANTO','simpleitk','voxelm
         # adata_combined = spatial_resample_to_adata(adata_combined,grid_size=4)
         # print(adata_fixed)
         # print(adata_full)
-        adata_fused = spatial_regrid_fuse_gpu_robust(adata_full,grid_size=2,alpha=0.6,fuse_radius=5)
+        adata_fused = spatial_regrid_fuse_gpu_robust(adata_full,grid_size=2,alpha=0.4,fuse_radius=4)
         print(adata_fused)
         # # print(adata_fused)
         exprs = load_gene_expression(adata_fused, genes)
@@ -802,7 +804,7 @@ for method in ['initial','nicetrans','ours1','paste','SANTO','simpleitk','voxelm
         # plot_marker_genes(adata_fused, genes, exprs)
         #
         #
-        # compare_original_vs_fused(adata_single,adata_fused)
+        compare_original_vs_fused(adata_single,adata_fused)
         # adata_combined = spatial_resample_nmf(adata_combined,grid_size=50)
 
         # print(adata_combined)

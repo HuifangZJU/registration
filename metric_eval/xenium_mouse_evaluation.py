@@ -13,7 +13,6 @@ def load_data_from_folder(folder_path):
     offset=5
     data = np.load(folder_path)
 
-
     pts1 = data["pts1"]  # shape (4200, 2)
     pts2 = data["pts2"]
 
@@ -183,14 +182,39 @@ def get_mask(boundary,shape):
         mask[rr, cc] = 1  # Fill the region
     return mask
 
-def create_boundary_mask(coords, shape, alpha=0.5):
+# def create_boundary_mask(coords, shape, alpha=0.5):
+#     if len(coords) < 3:
+#         return None  # A polygon cannot be formed
+#     boundary = alphashape.alphashape(coords, alpha)
+#     # Handle different geometry types
+#     mask = get_mask(boundary,shape)
+#
+#
+#     return boundary,mask
+from sklearn.neighbors import NearestNeighbors
+def create_boundary_mask(coords, shape, alpha=0.5, neighbor_k=5, neighbor_thresh=0.05):
     if len(coords) < 3:
-        return None  # A polygon cannot be formed
-    boundary = alphashape.alphashape(coords, alpha)
-    # Handle different geometry types
-    mask = get_mask(boundary,shape)
+        return None, None
 
-    return boundary,mask
+    coords = np.asarray(coords)
+
+    # ---- Step 1: filter isolated points ----
+    nbrs = NearestNeighbors(n_neighbors=min(neighbor_k, len(coords))).fit(coords)
+    distances, _ = nbrs.kneighbors(coords)
+    mean_dists = distances[:, 1:].mean(axis=1)  # ignore self (0 distance)
+
+    # threshold relative to median distance
+    thresh = np.median(mean_dists) * (1 + neighbor_thresh * 10)
+    keep_idx = mean_dists < thresh
+    filtered_coords = coords[keep_idx]
+
+    # ---- Step 2: create alpha shape ----
+    if len(filtered_coords) < 3:
+        return None, None
+
+    boundary = alphashape.alphashape(filtered_coords, alpha)
+    mask = get_mask(boundary, shape)
+    return boundary, mask
 
 def dice_coefficient(mask_A, mask_B):
     intersection = np.sum(mask_A & mask_B)
@@ -198,8 +222,10 @@ def dice_coefficient(mask_A, mask_B):
 
     return (2. * intersection) / sum_masks if sum_masks > 0 else 0.0
 
-def get_region_meta_data(coords, labels, mask_shape, alpha=0.01):
-    labels_ = np.unique(labels)
+def get_region_meta_data(coords,  labels, mask_shape,alpha=0.01):
+
+    # labels_ = np.unique(labels)
+    labels_=[0,1,2, 5, 6, 7, 9, 10, 11]
     regions={}
     for class_label in labels_:
         if np.isnan(class_label):
@@ -431,19 +457,14 @@ def evaluate_single_pair(folder_path,i,j,suffix):
 
     figure_suffix = str(i)+"_"+str(j)+"_"+suffix
     coords_A, coords_B, labels_A, labels_B,mask_shape_ = load_data_from_folder(folder_path)
+    # check_labels(coords_A,labels_A)
+    # check_labels(coords_B,labels_B)
+    plt.scatter(coords_A[:,0],coords_A[:,1],s=0.05)
+    plt.scatter(coords_B[:, 0], coords_B[:, 1],s=0.05)
+    plt.show()
 
-    if suffix == 'gpsa' or suffix =='santo':
-        pass
-    else:
-        labels_A = np.load("/media/huifang/data/registration/DLPFC/huifang/"+str(i)+"_"+str(j)+"_"+"region_label.npy")
-        labels_B = np.load("/media/huifang/data/registration/DLPFC/huifang/"+str(i)+"_"+str(j+1)+"_"+"region_label.npy")
 
-    check_labels(coords_A,labels_A)
-    check_labels(coords_B,labels_B)
-    if i ==0:
-        alpha_value = 0.05
-    else:
-        alpha_value = 0.1
+    alpha_value = 0.1
 
     scc_scores = spatial_cross_correlation(
         coords_A, labels_A, coords_B, labels_B, visualize=False
@@ -455,7 +476,7 @@ def evaluate_single_pair(folder_path,i,j,suffix):
         mask_shape=mask_shape_,
         alpha=alpha_value,
         visualize=True,
-        save=False
+        save=True
     )
 
     results = {
@@ -463,16 +484,17 @@ def evaluate_single_pair(folder_path,i,j,suffix):
         "Mean Centroid Shift": avg_shift,
         "Spatial Cross-Correlation": scc_scores
     }
-    print(results)
+    # print(results)
     return results
 
 
 def evaluate_multiple_pairs(root_folder,keys,suffix):
     all_results = {key: [] for key in keys}
-    for i in range(1,3):
-        for j in range(4):
-            data_path = root_folder+str(i)+"_"+str(j)+"_result.npz"
-            results = evaluate_single_pair(data_path,i,j,suffix)
+    pairs=[[0,1],[1,2]]
+    for group in range(0,2):
+        for pair in pairs:
+            data_path = root_folder+str(group)+"_"+str(pair[0])+"_"+str(pair[1])+"_result.npz"
+            results = evaluate_single_pair(data_path,pair[0],pair[1],suffix)
             for key in all_results:
                 all_results[key].append(results[key])
 
@@ -486,23 +508,28 @@ def evaluate_multiple_pairs(root_folder,keys,suffix):
 # Example: Single pair evaluation
 # single_results = evaluate_single_pair("/home/huifang/workspace/code/registration/result/original/DLPFC/0_0_result.npz")
 # print("Single Pair Evaluation Results:", single_results)
-result_root='/media/huifang/data/registration/result/pairwise_align/DLPFC/figures/'
+result_root='/media/huifang/data/registration/result/xenium/mouse_brain/figures/'
 # # Example: Multiple pairs evaluation
 keys=["Class-wise Dice Coefficient","Spatial Cross-Correlation", "Mean Centroid Shift"]
-print('Unaligned')
-average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/DLPFC/initial/",keys,"initial")
-# print('SimpleITK')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/simpleitk/",keys,"simpleitk")
-# print('PASTE')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/paste/",keys,'paste')
-# print('GPSA')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/GPSA/",keys,'gpsa')
-# print('SANTO')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/SANTO/",keys,'santo')
-# print('Voxelmorph')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/voxelmorph/",keys,'vxm')
-# print('Nicetrans')
-# average_results = evaluate_multiple_pairs("/media/huifang/data1/registration/result/pairwise_align/DLPFC/nicetrans/",keys,'nicetrans')
-# print('Ours')
-# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/pairwise_align/DLPFC/ours2_vis_best/",keys,"Ours2")
 
+# print('Unaligned')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/initial/1024/",keys,"initial_1024")
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/initial/2048/",keys,"initial_2048")
+# print('SimpleITK')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/simpleitk/1024/",keys,"simpleitk_1024")
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/simpleitk/2048/",keys,"simpleitk_2048")
+# print('PASTE')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/PASTE/",keys,'paste')
+# print('GPSA')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/gpsa/",keys,'gpsa')
+# print('SANTO')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/SANTO/",keys,'santo')
+# print('Voxelmorph')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/vxm/1024/",keys,'vxm_1024')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/vxm/2048/",keys,'vxm_2048')
+# print('Nicetrans')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/nicetrans/1024/",keys,'nicetrans_1024')
+# average_results = evaluate_multiple_pairs("/media/huifang/data/registration/result/xenium/mouse_brain/nicetrans/2048/",keys,'nicetrans_2048')
+print('Ours')
+average_results = evaluate_multiple_pairs("//media/huifang/data/registration/result/xenium/mouse_brain/ours/1024/",keys,"Ours_1024")
+# average_results = evaluate_multiple_pairs("//media/huifang/data/registration/result/xenium/mouse_brain/ours/2048/",keys,"Ours_2048")

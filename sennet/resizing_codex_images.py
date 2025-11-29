@@ -13,7 +13,6 @@ for dirpath, _, filenames in os.walk(root_folder):
             print(file_path)
             # Load image
             img = tifffile.imread(file_path)
-
             # Extract channel
             channel_img = img[0, :, :]
 
